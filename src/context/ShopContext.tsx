@@ -1,25 +1,41 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, CartItem, SavedItem, Order, UserProfile, Address } from '../types';
+import React, { createContext, useContext, useState, useMemo } from 'react';
+import {
+  Product,
+  CartItem,
+  SavedItem,
+  Order,
+  UserProfile,
+  Address,
+  PriceAlert,
+  ToastMessage,
+  ActivePage,
+  SortOption,
+  OrderItem,
+} from '../types';
 import { PRODUCTS, DEMO_USER, INITIAL_ORDERS } from '../data/products';
-
-export interface ToastMessage {
-  id: string;
-  title: string;
-  message: string;
-  type: 'success' | 'info' | 'warning';
-}
-
-export type SortOption = 'relevance' | 'price-asc' | 'price-desc' | 'rating' | 'newest';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export interface FilterState {
   category: string;
+  brand: string;
   minPrice: number;
   maxPrice: number;
   minRating: number;
-  brand: string;
   inStockOnly: boolean;
   sortBy: SortOption;
 }
+
+const DEFAULT_FILTERS: FilterState = {
+  category: 'all',
+  brand: 'all',
+  minPrice: 0,
+  maxPrice: 200000,
+  minRating: 0,
+  inStockOnly: false,
+  sortBy: 'relevance',
+};
+
+export { type SortOption };
 
 interface ShopContextType {
   products: Product[];
@@ -28,158 +44,115 @@ interface ShopContextType {
   wishlist: string[];
   orders: Order[];
   user: UserProfile | null;
-  activePage: 'home' | 'listing' | 'product-detail' | 'cart' | 'orders' | 'account';
+  priceAlerts: PriceAlert[];
+  toasts: ToastMessage[];
+  couponCode: string | null;
+  couponDiscount: number;
+  activePage: ActivePage;
   selectedProductId: string | null;
   searchQuery: string;
-  promoCode: string | null;
-  promoDiscount: number;
   filters: FilterState;
-  toasts: ToastMessage[];
-  // Navigation actions
-  setActivePage: (page: 'home' | 'listing' | 'product-detail' | 'cart' | 'orders' | 'account') => void;
+
+  // Navigation & Page State
+  setActivePage: (page: ActivePage) => void;
   openProduct: (productId: string) => void;
+  setSearchQuery: (query: string) => void;
   searchProducts: (query: string) => void;
   setCategory: (category: string) => void;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   resetFilters: () => void;
-  // Cart & Wishlist actions
-  addToCart: (product: Product, quantity?: number, color?: string, size?: string) => void;
-  buyNow: (product: Product, quantity?: number, color?: string, size?: string) => void;
-  updateCartQuantity: (productId: string, quantity: number) => void;
-  removeFromCart: (productId: string) => void;
-  saveForLater: (productId: string) => void;
+
+  // Cart operations
+  addToCart: (product: Product, quantity?: number, selectedColor?: string, selectedSize?: string) => void;
+  buyNow: (product: Product, quantity?: number, selectedColor?: string, selectedSize?: string) => void;
+  updateCartQuantity: (productId: string, quantity: number, color?: string, size?: string) => void;
+  removeFromCart: (productId: string, color?: string, size?: string) => void;
+  saveForLater: (productId: string, color?: string, size?: string) => void;
   moveToCartFromSaved: (productId: string) => void;
   removeSavedItem: (productId: string) => void;
+  clearCart: () => void;
+
+  // Wishlist
   toggleWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
-  clearCart: () => void;
-  // Order actions
+  moveToCartFromWishlist: (productId: string) => void;
+  removeFromWishlist: (productId: string) => void;
+
+  // Price alert
+  setPriceAlert: (productId: string, targetPrice: number, notifyMethod?: 'email' | 'in-app' | 'both') => void;
+  removePriceAlert: (alertId: string) => void;
+  getPriceAlertForProduct: (productId: string) => PriceAlert | undefined;
+  simulatePriceDropTest: (productId: string, dropAmount?: number) => void;
+
+  // Coupons
+  applyCoupon: (code: string) => { success: boolean; message: string };
+  removeCoupon: () => void;
+
+  // Orders
   placeOrder: (
-    deliveryAddress: Address,
+    address: Address,
     paymentMethod: 'UPI' | 'Credit/Debit Card' | 'Cash on Delivery',
     deliveryCharge: number
   ) => Order;
   cancelOrder: (orderId: string) => void;
-  // Promo code
-  applyPromoCode: (code: string) => boolean;
-  removePromoCode: () => void;
-  // Auth simulation
+  reorderItems: (items: OrderItem[]) => void;
+
+  // User auth simulation
   loginUser: (email: string, name?: string) => void;
   logoutUser: () => void;
   updateUserAddresses: (addresses: Address[]) => void;
-  // UI helpers
-  showToast: (title: string, message: string, type?: 'success' | 'info' | 'warning') => void;
+
+  // Toast notifications
+  showToast: (
+    title: string,
+    message: string,
+    type?: 'success' | 'info' | 'warning',
+    action?: { label: string; onClick: () => void }
+  ) => void;
   dismissToast: (id: string) => void;
-  // Computed values
+
+  // Calculated values
   cartSubtotal: number;
+  cartDiscount: number;
+  deliveryCharge: number;
+  cartTotal: number;
   cartCount: number;
   wishlistCount: number;
 }
-
-const DEFAULT_FILTERS: FilterState = {
-  category: 'all',
-  minPrice: 0,
-  maxPrice: 1500,
-  minRating: 0,
-  brand: 'all',
-  inStockOnly: false,
-  sortBy: 'relevance',
-};
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products] = useState<Product[]>(PRODUCTS);
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('shopnest_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useLocalStorage<CartItem[]>('shopnest_cart', []);
+  const [savedForLater, setSavedForLater] = useLocalStorage<SavedItem[]>('shopnest_saved', []);
+  const [wishlist, setWishlist] = useLocalStorage<string[]>('shopnest_wishlist', ['el-01', 'ac-01']);
+  const [orders, setOrders] = useLocalStorage<Order[]>('shopnest_orders', INITIAL_ORDERS);
+  const [user, setUser] = useLocalStorage<UserProfile | null>('shopnest_user', DEMO_USER);
+  const [priceAlerts, setPriceAlerts] = useLocalStorage<PriceAlert[]>('shopnest_alerts', [
+    {
+      id: 'pa-init-1',
+      productId: 'el-01',
+      productName: 'AuraWave Over-Ear Wireless Headphones with Active Noise Cancellation',
+      currentPrice: 4999,
+      targetPrice: 4499,
+      userEmail: DEMO_USER.email,
+      createdAt: '2026-09-20',
+      notifyMethod: 'both',
+      status: 'active',
+    },
+  ]);
 
-  const [savedForLater, setSavedForLater] = useState<SavedItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('shopnest_saved');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('shopnest_wishlist');
-      return saved ? JSON.parse(saved) : ['sn-audio-01', 'sn-comp-01'];
-    } catch {
-      return ['sn-audio-01', 'sn-comp-01'];
-    }
-  });
-
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('shopnest_orders');
-      return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-    } catch {
-      return INITIAL_ORDERS;
-    }
-  });
-
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('shopnest_user');
-      return saved ? JSON.parse(saved) : DEMO_USER;
-    } catch {
-      return DEMO_USER;
-    }
-  });
-
-  const [activePage, setActivePage] = useState<'home' | 'listing' | 'product-detail' | 'cart' | 'orders' | 'account'>('home');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<ActivePage>('home');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>('el-01');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [promoCode, setPromoCode] = useState<string | null>(null);
-  const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<number>(0);
 
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem('shopnest_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
-    localStorage.setItem('shopnest_saved', JSON.stringify(savedForLater));
-  }, [savedForLater]);
-
-  useEffect(() => {
-    localStorage.setItem('shopnest_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
-
-  useEffect(() => {
-    localStorage.setItem('shopnest_orders', JSON.stringify(orders));
-  }, [orders]);
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('shopnest_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('shopnest_user');
-    }
-  }, [user]);
-
-  const showToast = (title: string, message: string, type: 'success' | 'info' | 'warning' = 'success') => {
-    const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
-    setToasts((prev) => [...prev, { id, title, message, type }]);
-    setTimeout(() => {
-      dismissToast(id);
-    }, 3800);
-  };
-
-  const dismissToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
+  // Navigation helpers
   const openProduct = (productId: string) => {
     setSelectedProductId(productId);
     setActivePage('product-detail');
@@ -192,235 +165,412 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const setCategory = (cat: string) => {
-    setFilters((prev) => ({ ...prev, category: cat }));
+  const setCategory = (category: string) => {
+    setFilters((prev) => ({ ...prev, category }));
     setActivePage('listing');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetFilters = () => {
     setFilters(DEFAULT_FILTERS);
+    setSearchQuery('');
   };
 
-  const addToCart = (product: Product, quantity = 1, color?: string, size?: string) => {
-    const chosenColor = color || (product.colors.length > 0 ? product.colors[0].name : undefined);
-    const chosenSize = size || (product.sizes && product.sizes.length > 0 ? product.sizes[0] : undefined);
+  // Toast Manager
+  const showToast = (
+    title: string,
+    message: string,
+    type: 'success' | 'info' | 'warning' = 'success',
+    action?: { label: string; onClick: () => void }
+  ) => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
+    setToasts((prev) => [...prev, { id, title, message, type, action }]);
+    setTimeout(() => {
+      dismissToast(id);
+    }, 3500);
+  };
 
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Cart Management
+  const addToCart = (product: Product, quantity = 1, selectedColor?: string, selectedSize?: string) => {
     setCart((prev) => {
-      const existingIndex = prev.findIndex(
-        (item) => item.product.id === product.id && item.selectedColor === chosenColor && item.selectedSize === chosenSize
+      const idx = prev.findIndex(
+        (item) =>
+          item.product.id === product.id &&
+          item.selectedColor === selectedColor &&
+          item.selectedSize === selectedSize
       );
 
-      if (existingIndex > -1) {
+      if (idx > -1) {
         const next = [...prev];
-        next[existingIndex] = {
-          ...next[existingIndex],
-          quantity: next[existingIndex].quantity + quantity,
-        };
+        const newQty = Math.min(product.stock, next[idx].quantity + quantity);
+        next[idx] = { ...next[idx], quantity: newQty };
         return next;
       }
 
-      return [...prev, { product, quantity, selectedColor: chosenColor, selectedSize: chosenSize }];
+      return [
+        ...prev,
+        {
+          product,
+          quantity: Math.min(product.stock, quantity),
+          selectedColor,
+          selectedSize,
+        },
+      ];
     });
 
-    showToast('Added to Cart', `${product.title} has been added to your shopping cart.`);
+    showToast('Added to cart', `${product.name} added to your basket.`);
   };
 
-  const buyNow = (product: Product, quantity = 1, color?: string, size?: string) => {
-    addToCart(product, quantity, color, size);
+  const buyNow = (product: Product, quantity = 1, selectedColor?: string, selectedSize?: string) => {
+    addToCart(product, quantity, selectedColor, selectedSize);
     setActivePage('cart');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const updateCartQuantity = (productId: string, quantity: number) => {
+  const updateCartQuantity = (productId: string, quantity: number, color?: string, size?: string) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(productId, color, size);
       return;
     }
+
     setCart((prev) =>
-      prev.map((item) => (item.product.id === productId ? { ...item, quantity } : item))
+      prev.map((item) => {
+        if (
+          item.product.id === productId &&
+          item.selectedColor === color &&
+          item.selectedSize === size
+        ) {
+          return { ...item, quantity: Math.min(item.product.stock, quantity) };
+        }
+        return item;
+      })
     );
   };
 
-  const removeFromCart = (productId: string) => {
-    const item = cart.find((i) => i.product.id === productId);
-    setCart((prev) => prev.filter((i) => i.product.id !== productId));
-    if (item) {
-      showToast('Removed from Cart', `${item.product.title} was removed from your cart.`, 'info');
+  const removeFromCart = (productId: string, color?: string, size?: string) => {
+    const itemToRemove = cart.find(
+      (item) =>
+        item.product.id === productId &&
+        item.selectedColor === color &&
+        item.selectedSize === size
+    );
+
+    setCart((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.product.id === productId &&
+            item.selectedColor === color &&
+            item.selectedSize === size
+          )
+      )
+    );
+
+    if (itemToRemove) {
+      showToast(
+        'Item removed',
+        `${itemToRemove.product.name} removed from your cart.`,
+        'info',
+        {
+          label: 'Undo',
+          onClick: () => {
+            setCart((curr) => [...curr, itemToRemove]);
+            showToast('Restored', 'Item restored to your cart.');
+          },
+        }
+      );
     }
   };
 
-  const saveForLater = (productId: string) => {
-    const item = cart.find((i) => i.product.id === productId);
+  const saveForLater = (productId: string, color?: string, size?: string) => {
+    const item = cart.find(
+      (i) =>
+        i.product.id === productId &&
+        i.selectedColor === color &&
+        i.selectedSize === size
+    );
     if (!item) return;
-    setCart((prev) => prev.filter((i) => i.product.id !== productId));
+
+    setCart((prev) =>
+      prev.filter(
+        (i) =>
+          !(
+            i.product.id === productId &&
+            i.selectedColor === color &&
+            i.selectedSize === size
+          )
+      )
+    );
+
     setSavedForLater((prev) => [
-      ...prev.filter((s) => s.product.id !== productId),
+      ...prev.filter(
+        (s) =>
+          !(
+            s.product.id === productId &&
+            s.selectedColor === color &&
+            s.selectedSize === size
+          )
+      ),
       {
         product: item.product,
         addedAt: new Date().toISOString(),
-        selectedColor: item.selectedColor,
+        selectedColor: color,
+        selectedSize: size,
       },
     ]);
-    showToast('Saved for Later', `${item.product.title} moved to Saved for Later.`, 'info');
+
+    showToast('Saved for later', 'Item moved to your saved list.');
   };
 
   const moveToCartFromSaved = (productId: string) => {
     const item = savedForLater.find((s) => s.product.id === productId);
     if (!item) return;
+
     setSavedForLater((prev) => prev.filter((s) => s.product.id !== productId));
-    addToCart(item.product, 1, item.selectedColor);
+    addToCart(item.product, 1, item.selectedColor, item.selectedSize);
   };
 
   const removeSavedItem = (productId: string) => {
     setSavedForLater((prev) => prev.filter((s) => s.product.id !== productId));
-    showToast('Item Removed', 'Product removed from your saved list.', 'info');
+    showToast('Removed', 'Item removed from saved list.', 'info');
   };
 
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  // Wishlist
   const toggleWishlist = (productId: string) => {
-    const product = products.find((p) => p.id === productId);
+    const prod = products.find((p) => p.id === productId);
+    const prodName = prod ? prod.name : 'Item';
     if (wishlist.includes(productId)) {
       setWishlist((prev) => prev.filter((id) => id !== productId));
-      showToast('Removed from Wishlist', `${product ? product.title : 'Item'} removed from your wishlist.`, 'info');
+      showToast('Removed from wishlist', `${prodName} removed from wishlist.`, 'info');
     } else {
       setWishlist((prev) => [...prev, productId]);
-      showToast('Added to Wishlist', `${product ? product.title : 'Item'} added to your wishlist.`);
+      showToast('Added to wishlist', `${prodName} saved to wishlist.`);
     }
   };
 
   const isInWishlist = (productId: string) => wishlist.includes(productId);
 
-  const clearCart = () => setCart([]);
+  const moveToCartFromWishlist = (productId: string) => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+    addToCart(prod, 1);
+    setWishlist((prev) => prev.filter((id) => id !== productId));
+    showToast('Moved to cart', `${prod.name} moved to cart.`);
+  };
 
-  const applyPromoCode = (code: string): boolean => {
+  const removeFromWishlist = (productId: string) => {
+    setWishlist((prev) => prev.filter((id) => id !== productId));
+    showToast('Removed from wishlist', 'Item removed from wishlist.', 'info');
+  };
+
+  // Price Alert
+  const setPriceAlert = (
+    productId: string,
+    targetPrice: number,
+    notifyMethod: 'email' | 'in-app' | 'both' = 'both'
+  ) => {
+    const prod = products.find((p) => p.id === productId);
+    const existingIndex = priceAlerts.findIndex((a) => a.productId === productId);
+    const newAlert: PriceAlert = {
+      id: existingIndex > -1 ? priceAlerts[existingIndex].id : `pa-${Date.now()}`,
+      productId,
+      productName: prod ? prod.name : 'Tracked Product',
+      currentPrice: prod ? prod.price : targetPrice,
+      targetPrice,
+      userEmail: user?.email || 'customer@example.com',
+      createdAt: new Date().toISOString().split('T')[0],
+      notifyMethod,
+      status: 'active',
+    };
+
+    if (existingIndex > -1) {
+      setPriceAlerts((prev) => {
+        const copy = [...prev];
+        copy[existingIndex] = newAlert;
+        return copy;
+      });
+      showToast('Price alert updated', `Target price set to ₹${targetPrice.toLocaleString('en-IN')}.`);
+    } else {
+      setPriceAlerts((prev) => [newAlert, ...prev]);
+      showToast(
+        'Price alert activated',
+        `We will notify you when price drops to ₹${targetPrice.toLocaleString('en-IN')}.`
+      );
+    }
+  };
+
+  const removePriceAlert = (alertId: string) => {
+    setPriceAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    showToast('Price alert removed', 'You will no longer receive alerts for this item.', 'info');
+  };
+
+  const getPriceAlertForProduct = (productId: string) => {
+    return priceAlerts.find((a) => a.productId === productId);
+  };
+
+  const simulatePriceDropTest = (productId: string, dropAmount = 500) => {
+    const prod = products.find((p) => p.id === productId);
+    const prodName = prod ? prod.name : 'Tracked item';
+    showToast(
+      'Price drop alert!',
+      `Price drop on ${prodName}! Reduced by ₹${dropAmount.toLocaleString('en-IN')}. Check your alerts.`,
+      'success'
+    );
+  };
+
+  // Coupons
+  const applyCoupon = (code: string) => {
     const clean = code.trim().toUpperCase();
-    if (clean === 'NEST10' || clean === 'WELCOME10') {
-      setPromoCode(clean);
-      setPromoDiscount(0.1); // 10% off
-      showToast('Promo Code Applied!', '10% discount applied to your order.');
-      return true;
+    if (clean === 'SHOPNEST10') {
+      setCouponCode(clean);
+      setCouponDiscount(0.1); // 10%
+      showToast('Coupon applied', '10% discount applied to your order.');
+      return { success: true, message: '10% discount applied successfully.' };
     }
-    if (clean === 'VIP20' || clean === 'SAVE20') {
-      setPromoCode(clean);
-      setPromoDiscount(0.2); // 20% off
-      showToast('VIP Promo Code Applied!', '20% special discount applied.');
-      return true;
+    if (clean === 'WELCOME20') {
+      setCouponCode(clean);
+      setCouponDiscount(0.2); // 20%
+      showToast('Coupon applied', '20% discount applied to your order.');
+      return { success: true, message: '20% discount applied successfully.' };
     }
-    showToast('Invalid Promo Code', 'Use code NEST10 for 10% off or VIP20 for 20% off.', 'warning');
-    return false;
+    return { success: false, message: 'Invalid code. Try SHOPNEST10 or WELCOME20.' };
   };
 
-  const removePromoCode = () => {
-    setPromoCode(null);
-    setPromoDiscount(0);
-    showToast('Promo Code Removed', 'Promo discount has been cleared.', 'info');
+  const removeCoupon = () => {
+    setCouponCode(null);
+    setCouponDiscount(0);
+    showToast('Coupon removed', 'Coupon code has been removed.', 'info');
   };
 
+  // Orders
   const placeOrder = (
-    deliveryAddress: Address,
+    address: Address,
     paymentMethod: 'UPI' | 'Credit/Debit Card' | 'Cash on Delivery',
-    deliveryCharge: number
+    delivCharge: number
   ): Order => {
-    const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-    const discount = subtotal * promoDiscount;
-    const finalTotal = subtotal - discount + deliveryCharge;
+    const sub = cart.reduce((acc, i) => acc + i.product.price * i.quantity, 0);
+    const disc = Math.round(sub * couponDiscount);
+    const tot = sub - disc + delivCharge;
 
     const newOrder: Order = {
-      id: `SN-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
-      date: new Date().toISOString().split('T')[0],
-      items: cart.map((item) => ({
-        productId: item.product.id,
-        title: item.product.title,
-        price: item.product.price,
-        quantity: item.quantity,
-        selectedColor: item.selectedColor,
-        themeColor: item.product.themeColor,
-        visualType: item.product.visualType,
+      id: `SN-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      items: cart.map((i) => ({
+        productId: i.product.id,
+        name: i.product.name,
+        price: i.product.price,
+        quantity: i.quantity,
+        image: i.product.images[0] || '',
+        selectedColor: i.selectedColor,
+        selectedSize: i.selectedSize,
       })),
-      subtotal,
-      discount,
-      deliveryCharge,
-      total: Number(finalTotal.toFixed(2)),
+      subtotal: sub,
+      discount: disc,
+      deliveryCharge: delivCharge,
+      total: tot,
       status: 'Ordered',
-      deliveryAddress,
+      deliveryAddress: address,
       paymentMethod,
       estimatedDeliveryDate: 'Within 2-3 business days',
       trackingHistory: [
-        {
-          status: 'Ordered',
-          timestamp: 'Just now',
-          location: 'Order Confirmed - ShopNest Fulfillment',
-          completed: true,
-        },
-        {
-          status: 'Shipped',
-          timestamp: 'Pending dispatch',
-          location: 'Regional Distribution Center',
-          completed: false,
-        },
-        {
-          status: 'Out for Delivery',
-          timestamp: 'Upcoming',
-          location: 'Local Delivery Facility',
-          completed: false,
-        },
-        {
-          status: 'Delivered',
-          timestamp: 'Estimated 2-3 days',
-          location: `${deliveryAddress.street}, ${deliveryAddress.city}`,
-          completed: false,
-        },
+        { status: 'Ordered', timestamp: 'Just now', location: 'Order Confirmed - Processing', completed: true },
+        { status: 'Shipped', timestamp: 'Pending', location: 'Fulfillment Center', completed: false },
+        { status: 'Out for Delivery', timestamp: 'Pending', location: 'Local Courier Facility', completed: false },
+        { status: 'Delivered', timestamp: 'Estimated in 2-3 days', location: `${address.city}, ${address.state}`, completed: false },
       ],
     };
 
     setOrders((prev) => [newOrder, ...prev]);
     clearCart();
-    setPromoCode(null);
-    setPromoDiscount(0);
-    showToast('Order Placed Successfully!', `Order ${newOrder.id} has been created.`);
+    setCouponCode(null);
+    setCouponDiscount(0);
+    showToast('Order placed', `Order #${newOrder.id} placed successfully.`);
     return newOrder;
   };
 
   const cancelOrder = (orderId: string) => {
     setOrders((prev) =>
       prev.map((o) => {
-        if (o.id === orderId && o.status === 'Ordered') {
+        if (o.id === orderId && o.status !== 'Delivered') {
           return {
             ...o,
-            status: 'Delivered', // mark handled or add cancelled
+            status: 'Ordered',
+            trackingHistory: [
+              ...o.trackingHistory,
+              { status: 'Ordered', timestamp: 'Just now', location: 'Order Cancelled by Customer', completed: true },
+            ],
           };
         }
         return o;
       })
     );
-    showToast('Order Update', `Order ${orderId} status updated.`, 'info');
+    showToast('Order updated', `Cancellation request submitted for #${orderId}.`, 'info');
   };
 
+  const reorderItems = (items: OrderItem[]) => {
+    items.forEach((item) => {
+      const prod = products.find((p) => p.id === item.productId);
+      if (prod) {
+        addToCart(prod, item.quantity, item.selectedColor, item.selectedSize);
+      }
+    });
+    setActivePage('cart');
+    showToast('Items added', 'Items added back to your cart.');
+  };
+
+  // User Authentication Simulation
   const loginUser = (email: string, name?: string) => {
-    setUser({
+    const usr: UserProfile = {
       ...DEMO_USER,
       email,
       name: name || email.split('@')[0],
-    });
-    showToast('Welcome Back', `Signed in as ${name || email}`);
+    };
+    setUser(usr);
+    showToast('Signed in', `Welcome back, ${usr.name}.`);
   };
 
   const logoutUser = () => {
     setUser(null);
-    showToast('Signed Out', 'You have been logged out of ShopNest.', 'info');
+    showToast('Signed out', 'You have been signed out.', 'info');
   };
 
   const updateUserAddresses = (addresses: Address[]) => {
     if (!user) return;
-    setUser({
-      ...user,
-      addresses,
-    });
-    showToast('Address Updated', 'Your delivery addresses have been saved.');
+    setUser({ ...user, addresses });
+    showToast('Address saved', 'Your address book has been updated.');
   };
 
-  const cartSubtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const wishlistCount = wishlist.length;
+  // Calculated totals
+  const cartSubtotal = useMemo(
+    () => cart.reduce((acc, i) => acc + i.product.price * i.quantity, 0),
+    [cart]
+  );
+  const cartDiscount = useMemo(
+    () => Math.round(cartSubtotal * couponDiscount),
+    [cartSubtotal, couponDiscount]
+  );
+  // Free delivery over ₹499, otherwise ₹40
+  const deliveryCharge = useMemo(
+    () => (cartSubtotal >= 499 || cartSubtotal === 0 ? 0 : 40),
+    [cartSubtotal]
+  );
+  const cartTotal = useMemo(
+    () => cartSubtotal - cartDiscount + deliveryCharge,
+    [cartSubtotal, cartDiscount, deliveryCharge]
+  );
+  const cartCount = useMemo(
+    () => cart.reduce((acc, i) => acc + i.quantity, 0),
+    [cart]
+  );
+  const wishlistCount = useMemo(() => wishlist.length, [wishlist]);
 
   return (
     <ShopContext.Provider
@@ -431,15 +581,17 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         wishlist,
         orders,
         user,
+        priceAlerts,
+        toasts,
+        couponCode,
+        couponDiscount,
         activePage,
         selectedProductId,
         searchQuery,
-        promoCode,
-        promoDiscount,
         filters,
-        toasts,
         setActivePage,
         openProduct,
+        setSearchQuery,
         searchProducts,
         setCategory,
         setFilters,
@@ -451,19 +603,29 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         saveForLater,
         moveToCartFromSaved,
         removeSavedItem,
+        clearCart,
         toggleWishlist,
         isInWishlist,
-        clearCart,
+        moveToCartFromWishlist,
+        removeFromWishlist,
+        setPriceAlert,
+        removePriceAlert,
+        getPriceAlertForProduct,
+        simulatePriceDropTest,
+        applyCoupon,
+        removeCoupon,
         placeOrder,
         cancelOrder,
-        applyPromoCode,
-        removePromoCode,
+        reorderItems,
         loginUser,
         logoutUser,
         updateUserAddresses,
         showToast,
         dismissToast,
         cartSubtotal,
+        cartDiscount,
+        deliveryCharge,
+        cartTotal,
         cartCount,
         wishlistCount,
       }}
@@ -473,10 +635,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useShop = () => {
+export function useShop(): ShopContextType {
   const context = useContext(ShopContext);
   if (!context) {
     throw new Error('useShop must be used within a ShopProvider');
   }
   return context;
-};
+}

@@ -7,8 +7,10 @@ import {
   Star,
   X,
   RotateCcw,
-  Search,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { formatPrice } from '../utils/formatters';
 
 export const ProductListing: React.FC = () => {
   const {
@@ -17,14 +19,26 @@ export const ProductListing: React.FC = () => {
     setFilters,
     resetFilters,
     searchQuery,
-    searchProducts,
   } = useShop();
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  // Extract unique brands for the filter sidebar
-  const uniqueBrands = useMemo(() => {
-    const brands = Array.from(new Set(products.map((p) => p.brand)));
+  // Collapsible filter group states
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    category: true,
+    price: true,
+    rating: true,
+    brand: true,
+    availability: true,
+  });
+
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Unique brands
+  const brandsList = useMemo(() => {
+    const brands = Array.from(new Set(products.map((p) => p.brand))).sort();
     return ['all', ...brands];
   }, [products]);
 
@@ -32,23 +46,23 @@ export const ProductListing: React.FC = () => {
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
-        // Search query filter
+        // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matches =
-            p.title.toLowerCase().includes(q) ||
+            p.name.toLowerCase().includes(q) ||
             p.brand.toLowerCase().includes(q) ||
             p.category.toLowerCase().includes(q) ||
             p.description.toLowerCase().includes(q);
           if (!matches) return false;
         }
 
-        // Category filter
+        // Category
         if (filters.category !== 'all' && p.category !== filters.category) {
           return false;
         }
 
-        // Brand filter
+        // Brand
         if (filters.brand !== 'all' && p.brand !== filters.brand) {
           return false;
         }
@@ -58,13 +72,13 @@ export const ProductListing: React.FC = () => {
           return false;
         }
 
-        // Rating filter
+        // Rating
         if (filters.minRating > 0 && p.rating < filters.minRating) {
           return false;
         }
 
-        // In Stock filter
-        if (filters.inStockOnly && !p.inStock) {
+        // Availability
+        if (filters.inStockOnly && p.stock <= 0) {
           return false;
         }
 
@@ -79,243 +93,241 @@ export const ProductListing: React.FC = () => {
           case 'rating':
             return b.rating - a.rating;
           case 'newest':
-            return b.id.localeCompare(a.id);
+            return b.createdAt.localeCompare(a.createdAt);
           case 'relevance':
           default:
-            return (b.isPopular ? 1 : 0) - (a.isPopular ? 1 : 0);
+            return 0;
         }
       });
   }, [products, filters, searchQuery]);
 
-  const activeFiltersCount =
-    (filters.category !== 'all' ? 1 : 0) +
-    (filters.brand !== 'all' ? 1 : 0) +
-    (filters.minPrice > 0 || filters.maxPrice < 1500 ? 1 : 0) +
-    (filters.minRating > 0 ? 1 : 0) +
-    (filters.inStockOnly ? 1 : 0);
+  // Active filter count
+  const activeChips: { label: string; onRemove: () => void }[] = [];
 
-  const renderFilterPanel = () => (
-    <div className="space-y-6">
+  if (filters.category !== 'all') {
+    activeChips.push({
+      label: `Category: ${filters.category}`,
+      onRemove: () => setFilters((prev) => ({ ...prev, category: 'all' })),
+    });
+  }
+
+  if (filters.brand !== 'all') {
+    activeChips.push({
+      label: `Brand: ${filters.brand}`,
+      onRemove: () => setFilters((prev) => ({ ...prev, brand: 'all' })),
+    });
+  }
+
+  if (filters.minRating > 0) {
+    activeChips.push({
+      label: `${filters.minRating}★ and above`,
+      onRemove: () => setFilters((prev) => ({ ...prev, minRating: 0 })),
+    });
+  }
+
+  if (filters.maxPrice < 200000) {
+    activeChips.push({
+      label: `Under ${formatPrice(filters.maxPrice)}`,
+      onRemove: () => setFilters((prev) => ({ ...prev, maxPrice: 200000 })),
+    });
+  }
+
+  if (filters.inStockOnly) {
+    activeChips.push({
+      label: 'In Stock Only',
+      onRemove: () => setFilters((prev) => ({ ...prev, inStockOnly: false })),
+    });
+  }
+
+  const renderFilterContent = () => (
+    <div className="space-y-5 text-left text-xs">
       {/* Category Filter */}
-      <div>
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-          Category
-        </h4>
-        <div className="space-y-1 text-sm">
-          {CATEGORIES_LIST.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setFilters((prev) => ({ ...prev, category: c.id }))}
-              className={`w-full text-left py-1 px-2 rounded-md transition-colors flex items-center justify-between text-xs ${
-                filters.category === c.id
-                  ? 'bg-emerald-50 text-emerald-800 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <span>{c.name}</span>
-              <span className="text-slate-400 text-[11px]">{c.count}</span>
-            </button>
-          ))}
-        </div>
+      <div className="border-b border-[#E5E5E2] pb-4">
+        <button
+          onClick={() => toggleSection('category')}
+          className="w-full flex items-center justify-between font-bold text-[#1A1A1A] py-1"
+        >
+          <span>Category</span>
+          {openSections.category ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {openSections.category && (
+          <div className="mt-2 space-y-1">
+            {CATEGORIES_LIST.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setFilters((prev) => ({ ...prev, category: c.id }))}
+                className={`w-full text-left py-1 px-2 rounded-[4px] transition-colors flex items-center justify-between ${
+                  filters.category === c.id
+                    ? 'bg-[#F7F7F5] text-[#0F766E] font-semibold'
+                    : 'text-[#5C5C5C] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <span>{c.name}</span>
+                <span className="text-[#5C5C5C]">{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Price Range Filter */}
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-          Price Range
-        </h4>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-400 block mb-0.5">Min ($)</label>
-              <input
-                type="number"
-                min="0"
-                max={filters.maxPrice}
-                value={filters.minPrice}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    minPrice: Math.max(0, Number(e.target.value) || 0),
-                  }))
-                }
-                className="w-full px-2 py-1.5 border border-slate-200 rounded text-slate-900 text-xs focus:outline-none focus:border-slate-400"
-              />
-            </div>
-            <span className="text-slate-400 self-end mb-1.5">-</span>
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-400 block mb-0.5">Max ($)</label>
-              <input
-                type="number"
-                min={filters.minPrice}
-                max="2000"
-                value={filters.maxPrice}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    maxPrice: Math.min(2000, Number(e.target.value) || 1500),
-                  }))
-                }
-                className="w-full px-2 py-1.5 border border-slate-200 rounded text-slate-900 text-xs focus:outline-none focus:border-slate-400"
-              />
-            </div>
+      <div className="border-b border-[#E5E5E2] pb-4">
+        <button
+          onClick={() => toggleSection('price')}
+          className="w-full flex items-center justify-between font-bold text-[#1A1A1A] py-1"
+        >
+          <span>Price</span>
+          {openSections.price ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {openSections.price && (
+          <div className="mt-2 space-y-1.5">
+            {[
+              { label: 'All Prices', max: 200000 },
+              { label: 'Under ₹1,000', max: 1000 },
+              { label: 'Under ₹5,000', max: 5000 },
+              { label: 'Under ₹15,000', max: 15000 },
+              { label: 'Under ₹50,000', max: 50000 },
+            ].map((p) => (
+              <button
+                key={p.label}
+                onClick={() => setFilters((prev) => ({ ...prev, maxPrice: p.max }))}
+                className={`w-full text-left py-1 px-2 rounded-[4px] transition-colors ${
+                  filters.maxPrice === p.max
+                    ? 'bg-[#F7F7F5] text-[#0F766E] font-semibold'
+                    : 'text-[#5C5C5C] hover:text-[#1A1A1A]'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1500"
-            step="25"
-            value={filters.maxPrice}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, maxPrice: Number(e.target.value) }))
-            }
-            className="w-full accent-slate-900 cursor-pointer"
-          />
-          <div className="flex justify-between text-[11px] text-slate-500">
-            <span>$0</span>
-            <span>Up to ${filters.maxPrice}</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Customer Rating Filter */}
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-          Customer Rating
-        </h4>
-        <div className="space-y-1.5 text-xs">
-          {[4, 3, 2].map((r) => (
-            <button
-              key={r}
-              onClick={() =>
-                setFilters((prev) => ({
-                  ...prev,
-                  minRating: prev.minRating === r ? 0 : r,
-                }))
-              }
-              className={`w-full text-left py-1 px-2 rounded-md transition-colors flex items-center gap-2 ${
-                filters.minRating === r
-                  ? 'bg-amber-50 text-amber-900 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center text-amber-500">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-3.5 h-3.5 ${
-                      i < r ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-[11px]">& Up</span>
-            </button>
-          ))}
-        </div>
+      <div className="border-b border-[#E5E5E2] pb-4">
+        <button
+          onClick={() => toggleSection('rating')}
+          className="w-full flex items-center justify-between font-bold text-[#1A1A1A] py-1"
+        >
+          <span>Customer rating</span>
+          {openSections.rating ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {openSections.rating && (
+          <div className="mt-2 space-y-1">
+            {[4, 3, 2].map((r) => (
+              <button
+                key={r}
+                onClick={() => setFilters((prev) => ({ ...prev, minRating: r }))}
+                className={`w-full text-left py-1 px-2 rounded-[4px] flex items-center gap-1.5 transition-colors ${
+                  filters.minRating === r
+                    ? 'bg-[#F7F7F5] text-[#0F766E] font-semibold'
+                    : 'text-[#5C5C5C] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <div className="flex items-center text-[#1A1A1A]">
+                  {Array.from({ length: r }).map((_, i) => (
+                    <Star key={i} size={13} className="fill-[#1A1A1A]" />
+                  ))}
+                </div>
+                <span>&amp; above</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Brand Filter */}
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-          Brand
-        </h4>
-        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-          {uniqueBrands.map((brand) => (
-            <button
-              key={brand}
-              onClick={() => setFilters((prev) => ({ ...prev, brand }))}
-              className={`w-full text-left py-1 px-2 rounded-md transition-colors text-xs capitalize ${
-                filters.brand === brand
-                  ? 'bg-emerald-50 text-emerald-800 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              {brand === 'all' ? 'All Brands' : brand}
-            </button>
-          ))}
-        </div>
+      <div className="border-b border-[#E5E5E2] pb-4">
+        <button
+          onClick={() => toggleSection('brand')}
+          className="w-full flex items-center justify-between font-bold text-[#1A1A1A] py-1"
+        >
+          <span>Brand</span>
+          {openSections.brand ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {openSections.brand && (
+          <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pr-1">
+            {brandsList.map((b) => (
+              <button
+                key={b}
+                onClick={() => setFilters((prev) => ({ ...prev, brand: b }))}
+                className={`w-full text-left py-1 px-2 rounded-[4px] transition-colors capitalize ${
+                  filters.brand === b
+                    ? 'bg-[#F7F7F5] text-[#0F766E] font-semibold'
+                    : 'text-[#5C5C5C] hover:text-[#1A1A1A]'
+                }`}
+              >
+                {b === 'all' ? 'All Brands' : b}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Availability Filter */}
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-          Availability
-        </h4>
-        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={filters.inStockOnly}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))
-            }
-            className="rounded border-slate-300 text-emerald-600 focus:ring-0"
-          />
-          <span>Exclude Out of Stock Items</span>
-        </label>
+      {/* Availability */}
+      <div>
+        <button
+          onClick={() => toggleSection('availability')}
+          className="w-full flex items-center justify-between font-bold text-[#1A1A1A] py-1"
+        >
+          <span>Availability</span>
+          {openSections.availability ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {openSections.availability && (
+          <label className="mt-2 flex items-center gap-2 text-[#1A1A1A] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filters.inStockOnly}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))
+              }
+              className="accent-[#0F766E] rounded-[4px]"
+            />
+            <span>Include in-stock items only</span>
+          </label>
+        )}
       </div>
 
-      {/* Clear Filters Button */}
-      {activeFiltersCount > 0 && (
+      {/* Reset Filters */}
+      {activeChips.length > 0 && (
         <button
           onClick={resetFilters}
-          className="w-full py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 border border-rose-200"
+          className="w-full h-8 mt-2 border border-[#E5E5E2] rounded-[6px] hover:border-[#1A1A1A] text-xs font-semibold text-[#1A1A1A] flex items-center justify-center gap-1.5 transition-colors"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Reset All Filters ({activeFiltersCount})
+          <RotateCcw size={14} strokeWidth={1.5} />
+          <span>Reset all filters</span>
         </button>
       )}
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header breadcrumb & results title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 gap-4">
+    <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-6 text-left">
+      {/* Top Bar above grid: Result Count and Sort dropdown */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#E5E5E2] gap-3">
         <div>
-          <div className="text-xs text-slate-500 mb-1">
-            <span>ShopNest Catalog</span>
-            {filters.category !== 'all' && (
-              <>
-                <span className="mx-1.5">/</span>
-                <span className="capitalize">{filters.category.replace('-', ' ')}</span>
-              </>
-            )}
-            {searchQuery && (
-              <>
-                <span className="mx-1.5">/</span>
-                <span>Search results for &ldquo;{searchQuery}&rdquo;</span>
-              </>
-            )}
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {searchQuery
-              ? `Results for "${searchQuery}"`
-              : filters.category !== 'all'
-              ? CATEGORIES_LIST.find((c) => c.id === filters.category)?.name
-              : 'All Products'}
+          <h1 className="text-[20px] font-bold text-[#1A1A1A]">
+            {searchQuery ? `Search results for "${searchQuery}"` : filters.category !== 'all' ? filters.category : 'All Products'}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Showing <strong className="text-slate-800 tabular-nums">{filteredProducts.length}</strong> items
+          <p className="text-xs text-[#5C5C5C]">
+            Showing {filteredProducts.length} of {products.length} products
           </p>
         </div>
 
-        {/* Sort & Mobile Filter Trigger */}
         <div className="flex items-center gap-3">
-          {/* Mobile Filter Toggle */}
+          {/* Mobile Filter Button */}
           <button
-            onClick={() => setMobileFilterOpen(true)}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 shadow-xs"
+            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+            className="md:hidden h-9 px-3 border border-[#E5E5E2] rounded-[6px] text-xs font-semibold text-[#1A1A1A] flex items-center gap-1.5"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+            <SlidersHorizontal size={16} strokeWidth={1.5} />
+            <span>Filters {activeChips.length > 0 && `(${activeChips.length})`}</span>
           </button>
 
-          {/* Sort Control */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500 hidden sm:inline whitespace-nowrap">
-              Sort by:
-            </label>
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[#5C5C5C] hidden sm:inline">Sort by:</span>
             <select
               value={filters.sortBy}
               onChange={(e) =>
@@ -324,9 +336,9 @@ export const ProductListing: React.FC = () => {
                   sortBy: e.target.value as SortOption,
                 }))
               }
-              className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 shadow-xs focus:outline-none cursor-pointer"
+              className="h-9 px-3 bg-[#FFFFFF] border border-[#E5E5E2] rounded-[6px] text-xs font-medium text-[#1A1A1A] focus:outline-none focus:border-[#0F766E] cursor-pointer"
             >
-              <option value="relevance">Featured & Relevance</option>
+              <option value="relevance">Featured &amp; Relevance</option>
               <option value="price-asc">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
               <option value="rating">Customer Rating</option>
@@ -337,161 +349,90 @@ export const ProductListing: React.FC = () => {
       </div>
 
       {/* Active Filter Chips */}
-      {activeFiltersCount > 0 && (
+      {activeChips.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 py-3">
-          <span className="text-xs text-slate-500">Active filters:</span>
-          {filters.category !== 'all' && (
-            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md">
-              Category: {CATEGORIES_LIST.find((c) => c.id === filters.category)?.name}
+          <span className="text-xs text-[#5C5C5C]">Active filters:</span>
+          {activeChips.map((chip, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1.5 text-xs bg-[#F7F7F5] border border-[#E5E5E2] rounded-[6px] px-2.5 py-1 text-[#1A1A1A]"
+            >
+              {chip.label}
               <button
-                onClick={() => setFilters((p) => ({ ...p, category: 'all' }))}
-                className="hover:text-rose-600"
+                onClick={chip.onRemove}
+                className="text-[#5C5C5C] hover:text-[#1A1A1A]"
+                aria-label={`Remove filter ${chip.label}`}
               >
-                <X className="w-3 h-3" />
+                <X size={14} strokeWidth={1.5} />
               </button>
             </span>
-          )}
-          {filters.brand !== 'all' && (
-            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md">
-              Brand: {filters.brand}
-              <button
-                onClick={() => setFilters((p) => ({ ...p, brand: 'all' }))}
-                className="hover:text-rose-600"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-          {filters.minRating > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md">
-              Rating: {filters.minRating}★ & above
-              <button
-                onClick={() => setFilters((p) => ({ ...p, minRating: 0 }))}
-                className="hover:text-rose-600"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-          {(filters.minPrice > 0 || filters.maxPrice < 1500) && (
-            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md">
-              ${filters.minPrice} - ${filters.maxPrice}
-              <button
-                onClick={() => setFilters((p) => ({ ...p, minPrice: 0, maxPrice: 1500 }))}
-                className="hover:text-rose-600"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
-          {filters.inStockOnly && (
-            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md">
-              In Stock Only
-              <button
-                onClick={() => setFilters((p) => ({ ...p, inStockOnly: false }))}
-                className="hover:text-rose-600"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
+          ))}
           <button
             onClick={resetFilters}
-            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline ml-2"
+            className="text-xs text-[#0F766E] font-medium hover:underline ml-1"
           >
             Clear all
           </button>
         </div>
       )}
 
-      {/* Main Grid + Sidebar Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mt-6 items-start">
-        {/* Desktop Sidebar Filters */}
-        <aside className="hidden lg:block bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs sticky top-24">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-slate-500" />
-              Filter Products
-            </h3>
-            {activeFiltersCount > 0 && (
-              <span className="text-xs text-slate-500 font-medium">
-                {activeFiltersCount} applied
-              </span>
-            )}
-          </div>
-          {renderFilterPanel()}
+      {/* Main Layout: Left Sidebar + Right Results Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 pt-4">
+        {/* Left Sidebar Filters on Desktop */}
+        <aside className="hidden md:block col-span-1 border-r border-[#E5E5E2] pr-6">
+          {renderFilterContent()}
         </aside>
 
-        {/* Product Cards Grid */}
-        <main className="lg:col-span-3">
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-400">
-                <Search className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">No products found</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-6">
-                We couldn&apos;t find matching items for your selected filters or search terms. Try adjusting your criteria.
-              </p>
-              <div className="flex items-center justify-center gap-3">
+        {/* Mobile Filters Drawer */}
+        {mobileFilterOpen && (
+          <div className="md:hidden fixed inset-0 z-50 bg-[#1A1A1A]/40 flex justify-end">
+            <div className="w-80 bg-[#FFFFFF] h-full p-6 overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E5E5E2] mb-4">
+                <h3 className="font-bold text-sm text-[#1A1A1A]">Filters</h3>
                 <button
-                  onClick={resetFilters}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="p-1 text-[#5C5C5C] hover:text-[#1A1A1A]"
                 >
-                  Reset All Filters
+                  <X size={20} strokeWidth={1.5} />
                 </button>
-                {searchQuery && (
-                  <button
-                    onClick={() => searchProducts('')}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200 transition-colors"
-                  >
-                    Clear Search
-                  </button>
-                )}
               </div>
+              {renderFilterContent()}
+              <button
+                onClick={() => setMobileFilterOpen(false)}
+                className="w-full h-10 mt-6 bg-[#0F766E] text-white rounded-[6px] text-xs font-semibold"
+              >
+                Apply filters
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+          </div>
+        )}
+
+        {/* Results Grid */}
+        <main className="col-span-1 md:col-span-3 lg:col-span-4">
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
+          ) : (
+            <div className="py-16 text-center border border-[#E5E5E2] rounded-[8px] bg-[#F7F7F5] p-8">
+              <h3 className="text-base font-semibold text-[#1A1A1A]">
+                No matching products found
+              </h3>
+              <p className="text-xs text-[#5C5C5C] mt-1 max-w-sm mx-auto">
+                Try loosening your filters or searching with different keywords.
+              </p>
+              <button
+                onClick={resetFilters}
+                className="mt-4 h-9 px-4 bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-semibold rounded-[6px] transition-colors"
+              >
+                Reset all filters
+              </button>
+            </div>
           )}
         </main>
       </div>
-
-      {/* Mobile Drawer Filter Modal */}
-      {mobileFilterOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
-            onClick={() => setMobileFilterOpen(false)}
-          />
-          <div className="relative ml-auto w-full max-w-xs bg-white h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between z-10">
-            <div>
-              <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
-                <h3 className="font-bold text-slate-900 text-base">Filter Catalog</h3>
-                <button
-                  onClick={() => setMobileFilterOpen(false)}
-                  className="p-1 rounded-md text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {renderFilterPanel()}
-            </div>
-
-            <div className="pt-6 border-t border-slate-200 mt-6">
-              <button
-                onClick={() => setMobileFilterOpen(false)}
-                className="w-full py-2.5 bg-slate-900 text-white font-semibold text-xs rounded-lg shadow-sm"
-              >
-                Apply Filters ({filteredProducts.length} Items)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

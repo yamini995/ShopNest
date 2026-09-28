@@ -1,205 +1,176 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useShop } from '../context/ShopContext';
-import { ShieldCheck, Truck, RotateCcw, Headphones, ArrowUp } from 'lucide-react';
+import { Truck, RotateCcw, ShieldCheck, ArrowUp } from 'lucide-react';
+import { CATEGORIES_LIST } from '../data/products';
 
 export const Footer: React.FC = () => {
-  const { setCategory, setActivePage, showToast } = useShop();
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newsletterEmail.includes('@')) {
-      showToast('Subscribed!', 'Thank you for subscribing to ShopNest curated weekly deals.');
-      setNewsletterEmail('');
-    }
-  };
+  const { setCategory, setActivePage } = useShop();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <footer className="bg-slate-950 text-slate-400 border-t border-slate-900 mt-16 text-xs">
-      {/* Back to top button */}
+    <footer className="bg-[#F7F7F5] border-t border-[#E5E5E2] text-xs text-[#5C5C5C] mt-16 text-left">
+      {/* Back to top */}
       <button
         onClick={scrollToTop}
-        className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors flex items-center justify-center gap-1.5 text-xs font-semibold"
+        className="w-full py-2.5 bg-[#FFFFFF] border-b border-[#E5E5E2] hover:bg-[#F7F7F5] text-[#1A1A1A] font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
       >
-        <ArrowUp className="w-3.5 h-3.5" />
-        Back to top
+        <ArrowUp size={14} strokeWidth={1.5} />
+        <span>Back to top</span>
       </button>
 
-      {/* Trust Pillars */}
-      <div className="border-b border-slate-900 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-slate-300">
+      {/* Trust banner */}
+      <div className="border-b border-[#E5E5E2] py-6">
+        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="flex items-center gap-3">
-            <Truck className="w-6 h-6 text-emerald-400 shrink-0" />
+            <Truck size={20} strokeWidth={1.5} className="text-[#0F766E] shrink-0" />
             <div>
-              <h4 className="font-bold text-white text-xs">Fast & Free Shipping</h4>
-              <p className="text-[11px] text-slate-400">On all eligible orders over $50</p>
+              <p className="font-bold text-[#1A1A1A]">Free delivery over ₹499</p>
+              <p className="text-[11px] text-[#5C5C5C]">Standard dispatch within 24 hours</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+            <RotateCcw size={20} strokeWidth={1.5} className="text-[#0F766E] shrink-0" />
             <div>
-              <h4 className="font-bold text-white text-xs">100% Genuine Products</h4>
-              <p className="text-[11px] text-slate-400">Directly from verified manufacturers</p>
+              <p className="font-bold text-[#1A1A1A]">Returns within 7 days</p>
+              <p className="text-[11px] text-[#5C5C5C]">Easy door pickup and fast refunds</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <RotateCcw className="w-6 h-6 text-emerald-400 shrink-0" />
+            <ShieldCheck size={20} strokeWidth={1.5} className="text-[#0F766E] shrink-0" />
             <div>
-              <h4 className="font-bold text-white text-xs">Hassle-Free Returns</h4>
-              <p className="text-[11px] text-slate-400">30-day money-back guarantee</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Headphones className="w-6 h-6 text-emerald-400 shrink-0" />
-            <div>
-              <h4 className="font-bold text-white text-xs">24/7 Dedicated Support</h4>
-              <p className="text-[11px] text-slate-400">Live chat and swift resolution</p>
+              <p className="font-bold text-[#1A1A1A]">100% Genuine products</p>
+              <p className="text-[11px] text-[#5C5C5C]">Sourced directly from verified brands</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Links Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-2 md:grid-cols-5 gap-8">
-        {/* Brand & Newsletter Column */}
-        <div className="col-span-2 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 text-slate-950 font-bold flex items-center justify-center text-sm">
-              S
-            </div>
-            <span className="text-xl font-extrabold tracking-tight text-white">ShopNest</span>
-          </div>
+      {/* Links Columns */}
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div>
+          <h4 className="font-bold text-xs text-[#1A1A1A] uppercase tracking-wider mb-3">
+            Shop by category
+          </h4>
+          <ul className="space-y-2">
+            {CATEGORIES_LIST.filter((c) => c.id !== 'all').slice(0, 6).map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => setCategory(c.id)}
+                  className="hover:text-[#0F766E] transition-colors"
+                >
+                  {c.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-          <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-            ShopNest is an independent, design-conscious marketplace delivering premium acoustics, computing gear, titanium wearables, and mindful living essentials.
-          </p>
-
-          <form onSubmit={handleSubscribe} className="space-y-2 max-w-sm pt-1">
-            <span className="text-xs font-semibold text-white block">
-              Subscribe for VIP product drops & discounts
-            </span>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                required
-                value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 text-xs focus:outline-none focus:border-slate-700"
-              />
+        <div>
+          <h4 className="font-bold text-xs text-[#1A1A1A] uppercase tracking-wider mb-3">
+            Customer service
+          </h4>
+          <ul className="space-y-2">
+            <li>
               <button
-                type="submit"
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg font-bold text-xs transition-colors shrink-0"
+                onClick={() => setActivePage('orders')}
+                className="hover:text-[#0F766E] transition-colors"
               >
-                Join
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Column 2: Departments */}
-        <div>
-          <h4 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-            Departments
-          </h4>
-          <ul className="space-y-2">
-            <li>
-              <button onClick={() => setCategory('electronics')} className="hover:text-white transition-colors">
-                Electronics & 4K
+                Track your order
               </button>
             </li>
             <li>
-              <button onClick={() => setCategory('audio')} className="hover:text-white transition-colors">
-                Audio & Noise-Cancelling
+              <button
+                onClick={() => setActivePage('orders')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Returns &amp; replacements
               </button>
             </li>
             <li>
-              <button onClick={() => setCategory('computers')} className="hover:text-white transition-colors">
-                Computers & Keyboards
+              <button
+                onClick={() => setActivePage('account')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Shipping policies
               </button>
             </li>
             <li>
-              <button onClick={() => setCategory('wearables')} className="hover:text-white transition-colors">
-                Titanium Wearables
-              </button>
-            </li>
-            <li>
-              <button onClick={() => setCategory('home-living')} className="hover:text-white transition-colors">
-                Home & Living
-              </button>
-            </li>
-            <li>
-              <button onClick={() => setCategory('lifestyle')} className="hover:text-white transition-colors">
-                Lifestyle & EDC
+              <button
+                onClick={() => setActivePage('account')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Help center &amp; FAQs
               </button>
             </li>
           </ul>
         </div>
 
-        {/* Column 3: Customer Care */}
         <div>
-          <h4 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-            Customer Care
+          <h4 className="font-bold text-xs text-[#1A1A1A] uppercase tracking-wider mb-3">
+            Account &amp; tools
           </h4>
           <ul className="space-y-2">
             <li>
-              <button onClick={() => setActivePage('orders')} className="hover:text-white transition-colors">
-                Track My Package
+              <button
+                onClick={() => setActivePage('account')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Your account
               </button>
             </li>
             <li>
-              <button onClick={() => setActivePage('orders')} className="hover:text-white transition-colors">
-                Shipping & Delivery Rates
+              <button
+                onClick={() => setActivePage('wishlist')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Your wishlist
               </button>
             </li>
             <li>
-              <button onClick={() => setActivePage('orders')} className="hover:text-white transition-colors">
-                Returns & Replacements
+              <button
+                onClick={() => setActivePage('account')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Price alerts
               </button>
             </li>
             <li>
-              <button onClick={() => setActivePage('account')} className="hover:text-white transition-colors">
-                Manage Prime & Addresses
+              <button
+                onClick={() => setActivePage('cart')}
+                className="hover:text-[#0F766E] transition-colors"
+              >
+                Shopping cart
               </button>
-            </li>
-            <li>
-              <span className="hover:text-white cursor-pointer">Help & FAQs</span>
             </li>
           </ul>
         </div>
 
-        {/* Column 4: Company & Policies */}
         <div>
-          <h4 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-            ShopNest Company
+          <h4 className="font-bold text-xs text-[#1A1A1A] uppercase tracking-wider mb-3">
+            About ShopNest
           </h4>
-          <ul className="space-y-2">
-            <li><span className="hover:text-white cursor-pointer">About Our Philosophy</span></li>
-            <li><span className="hover:text-white cursor-pointer">Authenticity Standards</span></li>
-            <li><span className="hover:text-white cursor-pointer">Sustainability Initiatives</span></li>
-            <li><span className="hover:text-white cursor-pointer">Privacy & Cookie Policy</span></li>
-            <li><span className="hover:text-white cursor-pointer">Terms of Commercial Sale</span></li>
-          </ul>
+          <p className="text-[11px] leading-relaxed mb-3">
+            ShopNest is an Indian retail marketplace offering curated electronics, fashion, books, and home essentials with verified customer reviews and fast doorstep fulfillment.
+          </p>
+          <p className="text-[11px] text-[#1A1A1A] font-semibold">
+            Support: support@shopnest.in
+          </p>
         </div>
       </div>
 
-      {/* Copyright Bar */}
-      <div className="border-t border-slate-900/80 py-6 px-4 text-center text-slate-500 text-[11px]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} ShopNest Inc. All rights reserved. Simulated Prototype Environment.</p>
-          <div className="flex items-center gap-4">
-            <span className="hover:text-slate-400 cursor-pointer">Terms of Use</span>
-            <span aria-hidden="true">·</span>
-            <span className="hover:text-slate-400 cursor-pointer">Privacy Notice</span>
-            <span aria-hidden="true">·</span>
-            <span className="hover:text-slate-400 cursor-pointer">Consumer Health Data</span>
+      {/* Copyright */}
+      <div className="border-t border-[#E5E5E2] py-4 bg-[#FFFFFF]">
+        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#5C5C5C]">
+          <p>&copy; {new Date().getFullYear()} ShopNest Retail India Pvt. Ltd. All rights reserved.</p>
+          <div className="flex gap-4">
+            <span className="hover:underline cursor-pointer">Conditions of Use</span>
+            <span className="hover:underline cursor-pointer">Privacy Notice</span>
+            <span className="hover:underline cursor-pointer">Interest-Based Ads</span>
           </div>
         </div>
       </div>

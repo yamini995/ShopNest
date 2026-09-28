@@ -12,6 +12,7 @@ import { ProductDetail } from './components/ProductDetail';
 import { CartView } from './components/CartView';
 import { OrdersView } from './components/OrdersView';
 import { AccountView } from './components/AccountView';
+import { WishlistView } from './components/WishlistView';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
@@ -23,11 +24,11 @@ const MainLayout: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100/60 font-sans text-slate-900 antialiased selection:bg-emerald-500 selection:text-slate-950">
-      {/* 3-Zone Header Contract & Navigation */}
+    <div className="min-h-screen flex flex-col bg-[#FFFFFF] font-sans text-[#1A1A1A] antialiased selection:bg-[#0F766E] selection:text-white">
+      {/* 2-Row Header */}
       <Header onOpenAuth={() => setIsAuthOpen(true)} />
 
-      {/* Dynamic Main Viewport Content */}
+      {/* Main Viewport Content */}
       <main className="flex-1">
         {activePage === 'home' && <HomeView />}
         {activePage === 'listing' && <ProductListing />}
@@ -37,9 +38,10 @@ const MainLayout: React.FC = () => {
         )}
         {activePage === 'orders' && <OrdersView />}
         {activePage === 'account' && <AccountView />}
+        {activePage === 'wishlist' && <WishlistView />}
       </main>
 
-      {/* Global Interactive Modals */}
+      {/* Global Modals */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}

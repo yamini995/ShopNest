@@ -1,16 +1,17 @@
 export type ProductCategory =
-  | 'electronics'
-  | 'audio'
-  | 'computers'
-  | 'wearables'
-  | 'home-living'
-  | 'lifestyle';
+  | 'Electronics'
+  | 'Mobiles'
+  | 'Laptops'
+  | 'Fashion'
+  | 'Shoes'
+  | 'Beauty'
+  | 'Home & Kitchen'
+  | 'Books'
+  | 'Accessories';
 
-export interface ProductVariant {
-  id: string;
+export interface ProductVariantColor {
   name: string;
-  colorHex?: string;
-  inStock: boolean;
+  hex: string;
 }
 
 export interface Review {
@@ -25,28 +26,29 @@ export interface Review {
 
 export interface Product {
   id: string;
-  title: string;
+  name: string;
+  title?: string;
   brand: string;
   category: ProductCategory;
   price: number;
   originalPrice: number;
-  discountPercentage: number;
   rating: number;
   reviewCount: number;
-  inStock: boolean;
-  stockCount: number;
-  deliveryTime: string;
-  isDealOfDay?: boolean;
-  isPopular?: boolean;
-  isRecommended?: boolean;
+  images: string[];
   description: string;
-  highlights: string[];
   specs: Record<string, string>;
-  colors: ProductVariant[];
+  colors?: ProductVariantColor[];
   sizes?: string[];
-  themeColor: string;
-  visualType: string;
-  reviews: Review[];
+  stock: number;
+  inStock?: boolean;
+  isNew?: boolean;
+  createdAt: string;
+  deliveryDays: number;
+  deliveryTime?: string;
+  hasSaleBadge?: boolean;
+  discountPercentage?: number;
+  visualType?: string;
+  themeColor?: string;
 }
 
 export interface CartItem {
@@ -60,6 +62,7 @@ export interface SavedItem {
   product: Product;
   addedAt: string;
   selectedColor?: string;
+  selectedSize?: string;
 }
 
 export interface Address {
@@ -79,12 +82,14 @@ export type OrderStatus = 'Ordered' | 'Shipped' | 'Out for Delivery' | 'Delivere
 
 export interface OrderItem {
   productId: string;
-  title: string;
+  name: string;
+  title?: string;
   price: number;
   quantity: number;
+  image: string;
   selectedColor?: string;
-  themeColor: string;
-  visualType: string;
+  selectedSize?: string;
+  visualType?: string;
 }
 
 export interface Order {
@@ -114,4 +119,53 @@ export interface UserProfile {
   phone: string;
   addresses: Address[];
   joinedDate: string;
+}
+
+export interface PriceAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  currentPrice: number;
+  targetPrice: number;
+  userEmail: string;
+  createdAt: string;
+  notifyMethod: 'email' | 'in-app' | 'both';
+  status: 'active' | 'triggered';
+}
+
+export interface ToastMessage {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'info' | 'warning';
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+export type ActivePage =
+  | 'home'
+  | 'listing'
+  | 'product-detail'
+  | 'cart'
+  | 'orders'
+  | 'account'
+  | 'wishlist';
+
+export type SortOption =
+  | 'relevance'
+  | 'price-asc'
+  | 'price-desc'
+  | 'rating'
+  | 'newest';
+
+export interface FilterState {
+  category: string;
+  minPrice: number;
+  maxPrice: number;
+  minRating: number;
+  brands: string[];
+  inStockOnly: boolean;
+  onSaleOnly: boolean;
 }
