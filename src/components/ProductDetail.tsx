@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useShop } from '../context/ShopContext';
 import { ProductCard } from './ProductCard';
 import { ProductImage } from './ProductImage';
@@ -18,6 +18,7 @@ export const ProductDetail: React.FC = () => {
   const {
     products,
     selectedProductId,
+    openProduct,
     addToCart,
     buyNow,
     toggleWishlist,
@@ -34,6 +35,15 @@ export const ProductDetail: React.FC = () => {
   const product = products.find((p) => p.id === selectedProductId) || products[0];
   const isWishlisted = isInWishlist(product.id);
   const activeAlert = getPriceAlertForProduct(product.id);
+
+  // Sibling variants sharing baseProductId or parent ID
+  const siblingVariants = useMemo(() => {
+    if (!product) return [];
+    const baseId = product.baseProductId || product.id;
+    return products.filter(
+      (p) => (p.baseProductId === baseId || p.id === baseId) && p.id !== product.id
+    );
+  }, [product, products]);
 
   // Gallery state
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -288,6 +298,55 @@ export const ProductDetail: React.FC = () => {
                       }`}
                     >
                       {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Other Options / Sibling Variants */}
+            {siblingVariants.length > 0 && (
+              <div className="pt-3 border-t border-[#E5E5E2]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-[#1A1A1A]">
+                    Other options:
+                  </span>
+                  <span className="text-[11px] text-[#5C5C5C]">
+                    {siblingVariants.length} alternate {siblingVariants.length === 1 ? 'edition' : 'editions'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {siblingVariants.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => openProduct(v.id)}
+                      className="p-2 border border-[#E5E5E2] hover:border-[#0F766E] rounded-[6px] text-left transition-colors flex items-center justify-between group bg-[#FFFFFF] hover:bg-[#F7F7F5]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <img
+                          src={v.images[0]}
+                          alt={v.name}
+                          className="w-10 h-10 object-contain rounded bg-[#F7F7F5] border border-[#E5E5E2] shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#1A1A1A] truncate group-hover:text-[#0F766E]">
+                            {v.variantOption || v.name}
+                          </p>
+                          <span className="text-[10px] text-[#5C5C5C] block">
+                            ★ {v.rating.toFixed(1)} ({v.reviewCount} reviews)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-bold text-[#1A1A1A] block">
+                          {formatPrice(v.price)}
+                        </span>
+                        {v.discountPercentage ? (
+                          <span className="text-[10px] font-semibold text-[#16A34A]">
+                            {v.discountPercentage}% OFF
+                          </span>
+                        ) : null}
+                      </div>
                     </button>
                   ))}
                 </div>

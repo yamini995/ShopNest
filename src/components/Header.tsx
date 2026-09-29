@@ -12,6 +12,7 @@ import {
   LogOut,
   MapPin,
   Menu,
+  Bot,
 } from 'lucide-react';
 import { CATEGORIES_LIST } from '../data/products';
 import { formatPrice } from '../utils/formatters';
@@ -107,6 +108,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
             <span className="hidden sm:inline">Returns within 7 days</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                if (window.openN8nChat) window.openN8nChat();
+              }}
+              className="hover:text-[#0F766E] transition-colors flex items-center gap-1 text-[#0F766E] font-medium"
+            >
+              <Bot size={13} className="text-[#0F766E]" />
+              <span>Ask AI Chatbot</span>
+            </button>
+            <span className="text-[#E5E5E2]">|</span>
             <button
               onClick={() => setActivePage('orders')}
               className="hover:text-[#0F766E] transition-colors"

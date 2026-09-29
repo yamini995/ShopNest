@@ -77,6 +77,17 @@ export const Footer: React.FC = () => {
           <ul className="space-y-2">
             <li>
               <button
+                onClick={() => {
+                  if (window.openN8nChat) window.openN8nChat();
+                }}
+                className="hover:text-[#0F766E] transition-colors flex items-center gap-1.5 text-[#0F766E] font-medium"
+              >
+                <span>Live assistant chat</span>
+                <span className="bg-[#0F766E]/10 text-[#0F766E] text-[10px] font-semibold px-1.5 py-0.5 rounded">n8n</span>
+              </button>
+            </li>
+            <li>
+              <button
                 onClick={() => setActivePage('orders')}
                 className="hover:text-[#0F766E] transition-colors"
               >
@@ -137,6 +148,17 @@ export const Footer: React.FC = () => {
                 className="hover:text-[#0F766E] transition-colors"
               >
                 Price alerts
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => {
+                  window.history.pushState({}, '', '/admin/catalog-check');
+                  setActivePage('catalog-check');
+                }}
+                className="hover:text-[#0F766E] transition-colors flex items-center gap-1 text-[11px] text-[#5C5C5C]"
+              >
+                <span>Catalog audit (/admin)</span>
               </button>
             </li>
             <li>

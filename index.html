@@ -12,9 +12,58 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- n8n Chatbot Widget Stylesheet -->
+    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+    <style>
+      :root {
+        --chat--color--primary: #0F766E;
+        --chat--color--primary-shade-50: #0d655e;
+        --chat--color--primary--shade-100: #0b544e;
+        --chat--color--secondary: #14B8A6;
+        --chat--color-secondary-shade-50: #0d9488;
+        --chat--color-white: #ffffff;
+        --chat--color-dark: #1A1A1A;
+        --chat--color-light: #F7F7F5;
+        --chat--font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      /* Ensure n8n chat launcher sits comfortably above mobile footer */
+      .n8n-chat, #n8n-chat, .chat-window-toggle {
+        z-index: 9999 !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="n8n-chat"></div>
+    <script type="module">
+      try {
+        const { createChat } = await import('https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js');
+        window.n8nChatInstance = createChat({
+          webhookUrl: 'https://yana1100.app.n8n.cloud/webhook/23eb6481-fff8-4365-bb1f-06d511222d1a/chat',
+          target: '#n8n-chat',
+          mode: 'window',
+          chatInputKey: 'chatInput',
+          chatSessionKey: 'sessionId',
+          showWelcomeScreen: false,
+          defaultLanguage: 'en',
+          initialMessages: [
+            'Hi there! 👋 Welcome to ShopNest.',
+            'How can I help you today? Ask me about products, orders, shipping, or recommendations!'
+          ],
+          i18n: {
+            en: {
+              title: 'ShopNest Assistant',
+              subtitle: 'Powered by n8n • Online 24/7',
+              footer: 'ShopNest Customer Support',
+              getStarted: 'New Conversation',
+              inputPlaceholder: 'Ask a question or search items...',
+            },
+          },
+        });
+      } catch (e) {
+        console.warn('n8n chat script load error:', e);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

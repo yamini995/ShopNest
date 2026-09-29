@@ -30,6 +30,10 @@ export interface Product {
   title?: string;
   brand: string;
   category: ProductCategory;
+  subcategory?: string;
+  slug?: string;
+  baseProductId?: string;
+  variantOption?: string;
   price: number;
   originalPrice: number;
   rating: number;
@@ -151,7 +155,8 @@ export type ActivePage =
   | 'cart'
   | 'orders'
   | 'account'
-  | 'wishlist';
+  | 'wishlist'
+  | 'catalog-check';
 
 export type SortOption =
   | 'relevance'
